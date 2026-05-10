@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stockfish Performance Improvement Plan</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2129;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #d29922;
+    --danger: #f85149;
+    --purple: #bc8cff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #0d1117 0%, #1a1e2e 40%, #1e293b 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 60px 40px 50px;
+    text-align: center;
+  }
+  .hero h1 {
+    font-size: 2.8em;
+    font-weight: 800;
+    background: linear-gradient(135deg, #58a6ff, #3fb950);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+  }
+  .hero .subtitle {
+    font-size: 1.15em;
+    color: var(--text-muted);
+    max-width: 700px;
+    margin: 0 auto 24px;
+  }
+  .hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 30px;
+  }
+  .hero-stat {
+    text-align: center;
+  }
+  .hero-stat .number {
+    font-size: 2em;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .hero-stat .label {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Layout */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 50px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+  }
+  .section-header .icon {
+    font-size: 1.5em;
+  }
+  .section-header h2 {
+    font-size: 1.6em;
+    font-weight: 700;
+  }
+
+  /* Profile table */
+  .profile-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+  }
+  .profile-table th, .profile-table td {
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .profile-table th {
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .profile-table tr:hover {
+    background: var(--surface2);
+  }
+  .bar-cell {
+    position: relative;
+  }
+  .bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  /* Improvement cards */
+  .improvement-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 20px;
+    transition: border-color 0.2s;
+  }
+  .improvement-card:hover {
+    border-color: var(--accent);
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .card-header h3 {
+    font-size: 1.2em;
+    font-weight: 600;
+  }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-high { background: rgba(63, 185, 80, 0.15); color: var(--accent2); border: 1px solid rgba(63, 185, 80, 0.3); }
+  .badge-medium { background: rgba(210, 153, 34, 0.15); color: var(--accent3); border: 1px solid rgba(210, 153, 34, 0.3); }
+  .badge-low { background: rgba(88, 166, 255, 0.15); color: var(--accent); border: 1px solid rgba(88, 166, 255, 0.3); }
+  .badge-risk-low { background: rgba(63, 185, 80, 0.1); color: var(--accent2); }
+  .badge-risk-med { background: rgba(210, 153, 34, 0.1); color: var(--accent3); }
+  .badge-risk-high { background: rgba(248, 81, 73, 0.1); color: var(--danger); }
+
+  .card-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .card-meta-item {
+    font-size: 0.85em;
+    color: var(--text-muted);
+  }
+  .card-meta-item strong {
+    color: var(--text);
+  }
+
+  .card-body p {
+    margin-bottom: 12px;
+    color: var(--text-muted);
+  }
+  .card-body p strong {
+    color: var(--text);
+  }
+
+  /* Code blocks */
+  .code-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 16px 0;
+  }
+  @media (max-width: 800px) {
+    .code-compare { grid-template-columns: 1fr; }
+  }
+  .code-panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .code-panel-header {
+    padding: 8px 16px;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .code-panel-header.before {
+    background: rgba(248, 81, 73, 0.1);
+    color: var(--danger);
+  }
+  .code-panel-header.after {
+    background: rgba(63, 185, 80, 0.1);
+    color: var(--accent2);
+  }
+  pre {
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.82em;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    background: var(--surface);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  .code-single {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    overflow-x: auto;
+  }
+
+  /* Priority matrix */
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .matrix-cell {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .matrix-cell h4 {
+    margin-bottom: 8px;
+    font-size: 1em;
+  }
+  .matrix-cell ul {
+    list-style: none;
+    padding: 0;
+  }
+  .matrix-cell li {
+    padding: 4px 0;
+    color: var(--text-muted);
+    font-size: 0.9em;
+  }
+  .matrix-cell li::before {
+    content: "▸ ";
+    color: var(--accent);
+  }
+
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 32px;
+    margin: 24px 0;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .timeline-item {
+    position: relative;
+    margin-bottom: 28px;
+  }
+  .timeline-dot {
+    position: absolute;
+    left: -26px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--bg);
+  }
+  .timeline-item h4 {
+    font-size: 1em;
+    margin-bottom: 4px;
+  }
+  .timeline-item p {
+    font-size: 0.9em;
+    color: var(--text-muted);
+  }
+
+  /* Risk table */
+  .risk-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .risk-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .risk-item h4 {
+    font-size: 0.95em;
+    margin-bottom: 6px;
+  }
+  .risk-item p {
+    font-size: 0.85em;
+    color: var(--text-muted);
+  }
+
+  /* TOC */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+  .toc h3 {
+    font-size: 1.1em;
+    margin-bottom: 12px;
+    color: var(--accent);
+  }
+  .toc ol {
+    padding-left: 20px;
+  }
+  .toc li {
+    padding: 4px 0;
+  }
+  .toc a {
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .toc a:hover {
+    color: var(--accent);
+  }
+
+  /* Callout */
+  .callout {
+    background: var(--surface);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .callout.warn {
+    border-left-color: var(--accent3);
+  }
+  .callout.success {
+    border-left-color: var(--accent2);
+  }
+  .callout p {
+    color: var(--text-muted);
+  }
+  .callout strong {
+    color: var(--text);
+  }
+
+  /* Summary card */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+  }
+  .summary-card .value {
+    font-size: 2em;
+    font-weight: 700;
+  }
+  .summary-card .desc {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .hl { color: var(--accent); }
+  .hl2 { color: var(--accent2); }
+  .hl3 { color: var(--accent3); }
+  .hlr { color: var(--danger); }
+  .hlp { color: var(--purple); }
+</style>
+</head>
+<body>
+
+<!-- ==================== HERO ==================== -->
+<div class="hero">
+  <h1>Stockfish Performance Improvement Plan</h1>
+  <p class="subtitle">A data-driven analysis of optimization opportunities based on profiling, code analysis, and deep understanding of the Stockfish 18 architecture.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="number">1.08M</div>
+      <div class="label">Baseline NPS</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">8</div>
+      <div class="label">Proposals</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">3</div>
+      <div class="label">Categories</div>
+    </div>
+    <div class="hero-stat">
+      <div class="number">~20K</div>
+      <div class="label">Lines Analyzed</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ==================== TOC ==================== -->
+<nav class="toc">
+  <h3>Table of Contents</h3>
+  <ol>
+    <li><a href="#methodology">Methodology &amp; Profiling Results</a></li>
+    <li><a href="#proposals">Improvement Proposals</a>
+      <ol>
+        <li><a href="#p1">P1: Enhanced Evasion Move Ordering</a></li>
+        <li><a href="#p2">P2: Nonlinear LMR Move Count Reduction</a></li>
+        <li><a href="#p3">P3: Capture Futility with Correction Value</a></li>
+        <li><a href="#p4">P4: Threat Weight Prefetching in Accumulator</a></li>
+        <li><a href="#p5">P5: Consolidated TT Probe Loop</a></li>
+        <li><a href="#p6">P6: qsearch Move Count Threshold Tuning</a></li>
+        <li><a href="#p7">P7: Adaptive Singular Extension Margin</a></li>
+        <li><a href="#p8">P8: Continuation History Depth-Decay in Evasions</a></li>
+      </ol>
+    </li>
+    <li><a href="#priority">Priority &amp; Implementation Order</a></li>
+    <li><a href="#testing">Testing &amp; Validation Strategy</a></li>
+    <li><a href="#risks">Risk Analysis</a></li>
+    <li><a href="#timeline">Implementation Timeline</a></li>
+  </ol>
+</nav>
+
+
+<!-- ==================== SECTION 1: METHODOLOGY ==================== -->
+<div class="section" id="methodology">
+  <div class="section-header">
+    <span class="icon">🔬</span>
+    <h2>Methodology &amp; Profiling Results</h2>
+  </div>
+
+  <p style="color: var(--text-muted); margin-bottom: 16px;">
+    The analysis was performed on <strong>macOS ARM64 (Apple Silicon)</strong> using the standard
+    <code>bench</code> command (depth-limited search of 80 positions). The binary was compiled with
+    <code>-O3 -g -flto</code> and profiled using macOS <code>sample</code> at 1ms intervals.
+  </p>
+
+  <h3 style="margin: 24px 0 12px;">CPU Time Distribution (Top Functions)</h3>
+  <table class="profile-table">
+    <thead>
+      <tr>
+        <th>Function</th>
+        <th>Samples</th>
+        <th>% Time</th>
+        <th>Distribution</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>search&lt;NonPV&gt;</code></td>
+        <td>5,200+</td>
+        <td>~55%</td>
+        <td class="bar-cell"><span class="bar" style="width: 275px;"></span></td>
+      </tr>
+      <tr>
+        <td><code>NNUE evaluation (total)</code></td>
+        <td>2,500+</td>
+        <td>~25%</td>
+        <td class="bar-cell"><span class="bar" style="width: 125px; background: var(--accent2);"></span></td>
+      </tr>
+      <tr>
+        <td><code>qsearch&lt;NonPV&gt;</code></td>
+        <td>768</td>
+        <td>~8%</td>
+        <td class="bar-cell"><span class="bar" style="width: 40px; background: var(--accent3);"></span></td>
+      </tr>
+      <tr>
+        <td><code>Worker::evaluate</code></td>
+        <td>547</td>
+        <td>~5.5%</td>
+        <td class="bar-cell"><span class="bar" style="width: 28px; background: var(--purple);"></span></td>
+      </tr>
+      <tr>
+        <td><code>MovePicker::next_move</code></td>
+        <td>192</td>
+        <td>~2%</td>
+        <td class="bar-cell"><span class="bar" style="width: 10px; background: var(--danger);"></span></td>
+      </tr>
+      <tr>
+        <td><code>TT::probe</code></td>
+        <td>53</td>
+        <td>~0.5%</td>
+        <td class="bar-cell"><span class="bar" style="width: 3px; background: var(--text-muted);"></span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin: 24px 0 12px;">NNUE Evaluation Breakdown</h3>
+  <table class="profile-table">
+    <thead>
+      <tr><th>Component</th><th>Samples</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>Network::evaluate</code></td><td>930</td><td>Post-accumulator layers (AffineTransform, ClippedReLU)</td></tr>
+      <tr><td><code>evaluate_side&lt;HalfKAv2_hm&gt;</code></td><td>363</td><td>PSQ accumulator updates (Finny tables)</td></tr>
+      <tr><td><code>evaluate_side&lt;FullThreats&gt;</code></td><td>382</td><td>Threat accumulator (full refresh + incremental)</td></tr>
+      <tr><td><code>AccumulatorUpdateContext&lt;FullThreats&gt;::apply</code></td><td>318</td><td>Threat weight add/sub in SIMD loop</td></tr>
+      <tr><td><code>AffineTransformSparseInput::propagate</code></td><td>184</td><td>Sparse 1024→31 layer</td></tr>
+      <tr><td><code>FeatureTransformer::transform</code></td><td>~350</td><td>Clipped pair multiplication (inside Network::evaluate)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <p><strong>Key Insight:</strong> The search function itself (alpha-beta + pruning logic) dominates CPU time.
+    NNUE evaluation is the second hotspot but is already heavily optimized with SIMD and incremental updates.
+    The best ROI comes from <strong>reducing the number of nodes searched</strong> (better pruning/reductions)
+    and <strong>improving move ordering</strong> (better first-move selection → more cutoffs → fewer nodes).</p>
+  </div>
+</div>
+
+
+<!-- ==================== SECTION 2: PROPOSALS ==================== -->
+<div class="section" id="proposals">
+  <div class="section-header">
+    <span class="icon">⚡</span>
+    <h2>Improvement Proposals</h2>
+  </div>
+
+
+  <!-- ===== P1 ===== -->
+  <div class="improvement-card" id="p1">
+    <div class="card-header">
+      <h3>P1: Enhanced Evasion Move Ordering</h3>
+      <div>
+        <span class="badge badge-high">High Impact</span>
+        <span class="badge badge-risk-low">Low Risk</span>
+      </div>
+    </div>
+    <div class="card-meta">
+      <span class="card-meta-item"><strong>File:</strong> movepick.cpp:248-253</span>
+      <span class="card-meta-item"><strong>Category:</strong> Move Ordering</span>
+      <span class="card-meta-item"><strong>Est. Impact:</strong> +5 to +15 Elo</span>
+    </div>
+    <div class="card-body">
+      <p><strong>Problem:</strong> When the king is in check, evasion moves are scored with a minimal formula:
+        captures get <code>PieceValue + (1 &lt;&lt; 28)</code> and quiet evasions only use
+        <code>mainHistory + contHist[0]</code>. In contrast, normal quiet moves use
+        <strong>7 history components</strong> (mainHistory ×2, pawnHistory ×2, contHist[0..3,5]).
+        This means evasion ordering is significantly worse than normal move ordering.</p>
+      <p><strong>Why it matters:</strong> Check evasions happen in critical positions. Poor ordering causes the search to explore bad evasion moves first, missing cutoffs. In endgames and tactical positions,
+        evasion ordering quality directly affects search depth.</p>
+      <p><strong>Proposed change:</strong> Add continuation history [1], pawn history, and threat-escape bonuses to evasion scoring.</p>
+    </div>
+    <div class="code-compare">
+      <div class="code-panel">
+        <div class="code-panel-header before">Current Code</div>
+<pre>else  // Type == EVASIONS
+{
+    if (pos.capture_stage(m))
+        m.value = PieceValue[capturedPiece]
+                + (1 &lt;&lt; 28);
+    else
+        m.value = (*mainHistory)[us][m.raw()]
+                + (*continuationHistory[0])[pc][to];
+}</pre>
+      </div>
+      <div class="code-panel">
+        <div class="code-panel-header after">Proposed Code</div>
+<pre>else  // Type == EVASIONS
+{
+    if (pos.capture_stage(m))
+        m.value = PieceValue[capturedPiece]
+                + (1 &lt;&lt; 28);
+    else
+        m.value = 2 * (*mainHistory)[us][m.raw()]
+                + (*continuationHistory[0])[pc][to]
+                + (*continuationHistory[1])[pc][to]
+                + sharedHistory-&gt;pawn_entry(pos)[pc][to];
+}</pre>
+      </div>
+    </div>
+    <div class="callout success">
+      <p><strong>Rationale:</strong> This mirrors the quiet move scoring approach. Adding <code>contHist[1]</code> (grandparent move context)
+        and <code>pawnHistory</code> (pawn structure context) gives the evasion picker much better information
+        about which quiet evasion to try first. The <code>2×</code> multiplier on mainHistory matches the quiet scoring weight.
+        Low risk because it only affects move ordering within evasions, not pruning decisions.</p>
+    </div>
+  </div>
+
+
+  <!-- ===== P2 ===== -->
+  <div class="improvement-card" id="p2">
+    <div class="card-header">
+      <h3>P2: Nonlinear LMR Move Count Reduction</h3>
+      <div>
+        <span class="badge badge-high">High Impact</span>
+        <span class="badge badge-risk-med">Medium Risk</span>
+      </div>
+    </div>
+    <div class="card-meta">
+      <span class="card-meta-item"><strong>File:</strong> search.cpp:1290</span>
+      <span class="card-meta-item"><strong>Category:</strong> Search Reduction</span>
+      <span class="card-meta-item"><strong>Est. Impact:</strong> +3 to +10 Elo</span>
+    </div>
+    <div class="card-body">
+      <p><strong>Problem:</strong> The current LMR formula reduces based on move count linearly:
+        <code>r -= moveCount * 65</code>. But the value of move ordering diminishes nonlinearly &mdash;
+        the difference between move #3 and #4 is much more significant than between move #30 and #31.</p>
+      <p><strong>Proposed change:</strong> Replace linear move count factor with a logarithmic decay, providing
+        stronger reduction for very late moves while being gentler on early-but-not-first moves.</p>
+    </div>
+    <div class="code-compare">
+      <div class="code-panel">
+        <div class="code-panel-header before">Current Code (search.cpp:1290)</div>
+<pre>r += 691;  // Base reduction offset
+r -= moveCount * 65;</pre>
+      </div>
+      <div class="code-panel">
+        <div class="code-panel-header after">Proposed Code</div>
+<pre>r += 691;  // Base reduction offset
+// Nonlinear: stronger reduction
+// for early moves, less for late
+r -= int(270 * std::log2(
+         std::max(1, moveCount)));</pre>
+      </div>
+    </div>
+    <div class="callout warn">
+      <p><strong>Note:</strong> The constant <code>270</code> is calibrated so that <code>270 * log2(10) ≈ 897</code>
+        which approximates the current <code>10 * 65 = 650</code> but with heavier weight on moves 2-5 and lighter
+        weight on moves 20+. This needs SPSA tuning to find the optimal coefficient. The <code>std::log2</code>
+        call is cheap (single instruction on ARM64).</p>
+    </div>
+  </div>
+
+
+  <!-- ===== P3 ===== -->
+  <div class="improvement-card" id="p3">
+    <div class="card-header">
+      <h3>P3: Capture Futility with Correction Value Adjustment</h3>
+      <div>
+        <span class="badge badge-medium">Medium Impact</span>
+        <span class="badge badge-risk-low">Low Risk</span>
+      </div>
+    </div>
+    <div class="card-meta">
+      <span class="card-meta-item"><strong>File:</strong> search.cpp:1103-1111</span>
+      <span class="card-meta-item"><strong>Category:</strong> Pruning</span>
+      <span class="card-meta-item"><strong>Est. Impact:</strong> +2 to +8 Elo</span>
+    </div>
+    <div class="card-body">
+      <p><strong>Problem:</strong> The capture futility pruning uses <code>ss-&gt;staticEval</code> as the
+        base for futility estimation, but doesn't account for the <em>reliability</em> of that estimate.
+        When the correction value is large (indicating the static eval was significantly wrong at previous positions),
+        the futility margin should be wider. Currently, <code>correctionValue</code> is already computed
+        (line ~742) but unused in capture futility.</p>
+      <p><strong>Proposed change:</strong> Widen the capture futility margin when correction value magnitude is high,
+        making pruning less aggressive when the position evaluation is unreliable.</p>
+    </div>
+    <div class="code-compare">
+      <div class="code-panel">
+        <div class="code-panel-header before">Current Code</div>
+<pre>// Futility pruning for captures
+if (!givesCheck && lmrDepth &lt; 7)
+{
+    Value futilityValue =
+      ss-&gt;staticEval + 218
+      + 223 * lmrDepth
+      + PieceValue[capturedPiece]
+      + 131 * captHist / 1024;
+
+    if (futilityValue &lt;= alpha)
+        continue;
+}</pre>
+      </div>
+      <div class="code-panel">
+        <div class="code-panel-header after">Proposed Code</div>
+<pre>// Futility pruning for captures
+if (!givesCheck && lmrDepth &lt; 7)
+{
+    Value futilityValue =
+      ss-&gt;staticEval + 218
+      + 223 * lmrDepth
+      + PieceValue[capturedPiece]
+      + 131 * captHist / 1024
+      + std::abs(correctionValue)
+          / 163840;
+
+    if (futilityValue &lt;= alpha)
+        continue;
+}</pre>
+      </div>
+    </div>
+    <div class="callout">
+      <p><strong>Rationale:</strong> The <code>correctionValue</code> is already computed earlier in the search function
+        (line ~742). Its magnitude indicates how much the static eval has been historically wrong in similar pawn
+        structures. Dividing by 163840 converts the raw correction (which ranges up to ~2M) into a 0-12 cp range,
+        making futility less aggressive in unreliable positions. The <code>std::abs()</code> makes it directionally
+        agnostic — we want wider margins regardless of whether eval was too high or too low.</p>
+    </div>
+  </div>
+
+
+  <!-- ===== P4 ===== -->
+  <div class="improvement-card" id="p4">
+    <div class="card-header">
+      <h3>P4: Threat Weight Prefetching in Accumulator Update</h3>
+      <div>
+        <span class="badge badge-medium">Medium Impact</span>
+        <span class="badge badge-risk-low">Low Risk</span>
+      </div>
+    </div>
+    <div class="card-meta">
+      <span class="card-meta-item"><strong>File:</strong> nnue/nnue_accumulator.cpp:305-340</span>
+      <span class="card-meta-item"><strong>Category:</strong> NNUE / Cache Efficiency</span>
+      <span class="card-meta-item"><strong>Est. Impact:</strong> +2-4% NPS</span>
+    </div>
+    <div class="card-body">
+      <p><strong>Problem:</strong> The threat accumulator update loop iterates over removed/added feature indices,
+        loading weight columns from <code>threatWeights[Dimensions * index]</code> for each feature.
+        Each weight column is 1024 × sizeof(int8_t) = 1KB, spanning ~16 cache lines.
+        When features have non-sequential indices, these loads cause L2 cache misses.</p>
+      <p><strong>Proposed change:</strong> Prefetch the next feature's weight column while processing the current one.
+        This hides memory latency behind computation.</p>
+    </div>
+    <div class="code-compare">
+      <div class="code-panel">
+        <div class="code-panel-header before">Current Loop (simplified)</div>
+<pre>for (int i = 0; i &lt; removed.ssize(); ++i)
+{
+    size_t index  = removed[i];
+    const size_t offset =
+       Dimensions * index;
+    auto* column = reinterpret_cast&lt;
+      const vec_i8_t*&gt;(
+        &threatWeights[offset]);
+
+    for (IndexType k = 0;
+         k &lt; NumRegs; k += 2)
+    {
+        acc[k] = vsubw_s8(acc[k],
+          vget_low_s8(column[k/2]));
+        acc[k+1] = vsubw_high_s8(
+          acc[k+1], column[k/2]);
+    }
+}</pre>
+      </div>
+      <div class="code-panel">
+        <div class="code-panel-header after">With Prefetch</div>
+<pre>for (int i = 0; i &lt; removed.ssize(); ++i)
+{
+    size_t index  = removed[i];
+    const size_t offset =
+       Dimensions * index;
+    auto* column = reinterpret_cast&lt;
+      const vec_i8_t*&gt;(
+        &threatWeights[offset]);
+
+    // Prefetch next column
+    if (i + 1 &lt; removed.ssize())
+        prefetch(&threatWeights[
+          Dimensions * removed[i+1]]);
+
+    for (IndexType k = 0;
+         k &lt; NumRegs; k += 2)
+    {
+        acc[k] = vsubw_s8(acc[k],
+          vget_low_s8(column[k/2]));
+        acc[k+1] = vsubw_high_s8(
+          acc[k+1], column[k/2]);
+    }
+}</pre>
+      </div>
+    </div>
+    <div class="callout">
+      <p><strong>Note:</strong> The existing codebase already uses <code>prefetch()</code> extensively (TT entries,
+        pawn history, correction history — see position.cpp:1040-1048). This follows the same pattern.
+        The threat accumulator update (<code>AccumulatorUpdateContext&lt;FullThreats&gt;::apply</code>) accounts
+        for ~318 samples (3.2% of CPU time). Even a 10% improvement in this hot loop = ~0.3% overall NPS gain.
+        Similarly add prefetch to the <code>added</code> loop and to the <code>update_threats_accumulator_full</code> function.</p>
+    </div>
+  </div>
+
+
+  <!-- ===== P5 ===== -->
+  <div class="improvement-card" id="p5">
+    <div class="card-header">
+      <h3>P5: Consolidated TT Probe Loop</h3>
+      <div>
+        <span class="badge badge-low">Low Impact</span>
+        <span class="badge badge-risk-low">Low Risk</span>
+      </div>
+    </div>
+    <div class="card-meta">
+      <span class="card-meta-item"><strong>File:</strong> tt.cpp:222-240</span>
+      <span class="card-meta-item"><strong>Category:</strong> NPS / Code Efficiency</span>
+      <span class="card-meta-item"><strong>Est. Impact:</strong> +0.5-1% NPS</span>
+    </div>
+    <div class="card-body">
+      <p><strong>Problem:</strong> The TT probe function currently uses two separate loops: one to search for a key match
+        (3 iterations), and on miss, another to find the best replacement candidate (2 iterations starting from index 1).
+        For misses, this means iterating over the same 3 entries twice, loading <code>depth8</code> and
+        <code>relative_age()</code> in the second pass even though they were available in the first pass.</p>
+      <p><strong>Proposed change:</strong> Track the best replacement candidate during the initial key search loop,
+        eliminating the second pass entirely.</p>
+    </div>
+    <div class="code-compare">
+      <div class="code-panel">
+        <div class="code-panel-header before">Current (two loops)</div>
+<pre>for (int i = 0; i &lt; ClusterSize; ++i)
+    if (tte[i].key16 == key16)
+        return {tte[i].is_occupied(),
+                tte[i].read(),
+                TTWriter(&tte[i])};
+
+// Second loop for replacement
+TTEntry* replace = tte;
+for (int i = 1; i &lt; ClusterSize; ++i)
+    if (replace-&gt;depth8
+        - 8*replace-&gt;relative_age(gen)
+      &gt; tte[i].depth8
+        - 8*tte[i].relative_age(gen))
+        replace = &tte[i];</pre>
+      </div>
+      <div class="code-panel">
+        <div class="code-panel-header after">Proposed (single loop)</div>
+<pre>TTEntry* replace = tte;
+for (int i = 0; i &lt; ClusterSize; ++i)
+{
+    if (tte[i].key16 == key16)
+        return {tte[i].is_occupied(),
+                tte[i].read(),
+                TTWriter(&tte[i])};
+
+    if (  replace-&gt;depth8
+        - 8*replace-&gt;relative_age(gen)
+      &gt;   tte[i].depth8
+        - 8*tte[i].relative_age(gen))
+        replace = &tte[i];
+}</pre>
+      </div>
+    </div>
+    <div class="callout">
+      <p><strong>Note:</strong> All 3 entries are in the same 32-byte cache line (already fetched), so the cache
+        benefit is minimal. The gain is from eliminating branch overhead and redundant field reads on misses.
+        TT probe accounts for only ~0.5% of CPU time, so the absolute impact is small. However, this is a
+        clean code improvement with zero risk.</p>
+    </div>
+  </div>
+
+
+  <!-- ===== P6 ===== -->
+  <div class="improvement-card" id="p6">
+    <div class="card-header">
+      <h3>P6: qsearch Move Count Threshold Tuning</h3>
+      <div>
+        <span class="badge badge-medium">Medium Impact</span>
+        <span class="badge badge-risk-med">Medium Risk</span>
+      </div>
+    </div>
+    <div class="card-meta">
+      <span class="card-meta-item"><strong>File:</strong> search.cpp:1666-1668</span>
+      <span class="card-meta-item"><strong>Category:</strong> Pruning / qsearch</span>
+      <span class="card-meta-item"><strong>Est. Impact:</strong> +2 to +7 Elo</span>
+    </div>
+    <div class="card-body">
+      <p><strong>Problem:</strong> In qsearch, the move count pruning threshold is a fixed <code>moveCount &gt; 2</code>.
+        This means in qsearch, after the TT move and 2 additional captures, all remaining non-checking
+        captures are pruned. However, this threshold doesn't account for whether we're in a <em>rich</em>
+        tactical position (many captures available) or a <em>quiet</em> one.</p>
+      <p><strong>Proposed change:</strong> Scale the threshold by the futility base relative to alpha.
+        When the position is much better than alpha (high futility base), we can prune more aggressively.
+        When close to alpha, allow more moves.</p>
+    </div>
+    <div class="code-compare">
+      <div class="code-panel">
+        <div class="code-panel-header before">Current Code</div>
+<pre>if (moveCount &gt; 2)
+    continue;</pre>
+      </div>
+      <div class="code-panel">
+        <div class="code-panel-header after">Proposed Code</div>
+<pre>if (moveCount &gt; 2
+    + (futilityBase &lt; alpha + 200))
+    continue;</pre>
+      </div>
+    </div>
+    <div class="callout">
+      <p><strong>Rationale:</strong> When <code>futilityBase</code> (staticEval + 328) is close to alpha,
+        we're in a position where material gains matter more, so allowing one extra capture to be searched
+        can find important tactical sequences. The condition <code>futilityBase &lt; alpha + 200</code>
+        evaluates to 0 or 1, effectively making the threshold 2 or 3. This is a safe, tunable change.
+        qsearch accounts for ~8% of CPU time, so even small improvements compound.</p>
+    </div>
+  </div>
+
+
+  <!-- ===== P7 ===== -->
+  <div class="improvement-card" id="p7">
+    <div class="card-header">
+      <h3>P7: Adaptive Singular Extension Margin</h3>
+      <div>
+        <span class="badge badge-high">High Impact</span>
+        <span class="badge badge-risk-med">Medium Risk</span>
+      </div>
+    </div>
+    <div class="card-meta">
+      <span class="card-meta-item"><strong>File:</strong> search.cpp:1177</span>
+      <span class="card-meta-item"><strong>Category:</strong> Search Extensions</span>
+      <span class="card-meta-item"><strong>Est. Impact:</strong> +5 to +15 Elo</span>
+    </div>
+    <div class="card-body">
+      <p><strong>Problem:</strong> Singular extension uses a fixed formula for its beta:
+        <code>singularBeta = ttValue - (60 + 66 * (ttPv &amp;&amp; !PvNode)) * depth / 55</code>.
+        This doesn't adapt to the <em>complexity</em> of the position. In simple endgames with few legal moves,
+        a move is more likely to be truly singular, so the margin should be tighter (extending more often).
+        In complex middlegames, moves are less likely singular.</p>
+      <p><strong>Proposed change:</strong> Scale the singular margin by the number of pieces on the board.
+        Fewer pieces → tighter margin → more extensions.</p>
+    </div>
+    <div class="code-compare">
+      <div class="code-panel">
+        <div class="code-panel-header before">Current Code</div>
+<pre>Value singularBeta =
+  ttData.value
+  - (60 + 66 * (ss-&gt;ttPv && !PvNode))
+    * depth / 55;</pre>
+      </div>
+      <div class="code-panel">
+        <div class="code-panel-header after">Proposed Code</div>
+<pre>int pieceFactor =
+  51 + pos.count&lt;ALL_PIECES&gt;();
+Value singularBeta =
+  ttData.value
+  - (60 + 66 * (ss-&gt;ttPv && !PvNode))
+    * depth / pieceFactor;</pre>
+      </div>
+    </div>
+    <div class="callout warn">
+      <p><strong>Details:</strong> With 32 pieces (opening), <code>pieceFactor = 83</code> → margin is <em>wider</em>
+        than current (less extension). With 6 pieces (endgame), <code>pieceFactor = 57</code> → margin is <em>tighter</em>
+        (more extension). The constant <code>51</code> is chosen so the formula behaves similarly to the current code
+        at typical middlegame piece counts (~14 pieces → pieceFactor ≈ 65, close to current 55).
+        <strong>Needs SPSA tuning</strong> for the base constant.</p>
+    </div>
+  </div>
+
+
+  <!-- ===== P8 ===== -->
+  <div class="improvement-card" id="p8">
+    <div class="card-header">
+      <h3>P8: Continuation History Depth-Decay in Scoring</h3>
+      <div>
+        <span class="badge badge-low">Low Impact</span>
+        <span class="badge badge-risk-low">Low Risk</span>
+      </div>
+    </div>
+    <div class="card-meta">
+      <span class="card-meta-item"><strong>File:</strong> movepick.cpp:228-234</span>
+      <span class="card-meta-item"><strong>Category:</strong> Move Ordering</span>
+      <span class="card-meta-item"><strong>Est. Impact:</strong> +1 to +5 Elo</span>
+    </div>
+    <div class="card-body">
+      <p><strong>Problem:</strong> In quiet move scoring, all 5 continuation history tables
+        (<code>contHist[0..3, 5]</code>) are weighted equally. However, <code>contHist[0]</code> (parent move context)
+        is far more predictive than <code>contHist[5]</code> (6 plies back). The equal weighting dilutes
+        the signal from the most relevant history.</p>
+      <p><strong>Proposed change:</strong> Apply a weighting scheme that emphasizes recent context.</p>
+    </div>
+    <div class="code-compare">
+      <div class="code-panel">
+        <div class="code-panel-header before">Current Code</div>
+<pre>m.value += (*continuationHistory[0])[pc][to];
+m.value += (*continuationHistory[1])[pc][to];
+m.value += (*continuationHistory[2])[pc][to];
+m.value += (*continuationHistory[3])[pc][to];
+m.value += (*continuationHistory[5])[pc][to];</pre>
+      </div>
+      <div class="code-panel">
+        <div class="code-panel-header after">Proposed Code</div>
+<pre>m.value += (*continuationHistory[0])[pc][to];
+m.value += (*continuationHistory[1])[pc][to];
+m.value += (*continuationHistory[2])[pc][to] * 3/4;
+m.value += (*continuationHistory[3])[pc][to] / 2;
+m.value += (*continuationHistory[5])[pc][to] / 2;</pre>
+      </div>
+    </div>
+    <div class="callout">
+      <p><strong>Rationale:</strong> <code>contHist[0]</code> and <code>[1]</code> (parent and grandparent context)
+        are the most reliable predictors. <code>contHist[2..5]</code> decay in relevance. Integer division
+        by 2 and multiplication by 3/4 are cheap (shift/add). This slightly reshapes the quiet move scoring
+        to prioritize recent contextual information. Needs empirical testing — the exact decay constants
+        should be SPSA-tuned.</p>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ==================== SECTION 3: PRIORITY ==================== -->
+<div class="section" id="priority">
+  <div class="section-header">
+    <span class="icon">📊</span>
+    <h2>Priority &amp; Implementation Order</h2>
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="value hl2">3</div>
+      <div class="desc">High Impact<br>P1, P2, P7</div>
+    </div>
+    <div class="summary-card">
+      <div class="value hl3">3</div>
+      <div class="desc">Medium Impact<br>P3, P4, P6</div>
+    </div>
+    <div class="summary-card">
+      <div class="value hl">2</div>
+      <div class="desc">Low Impact<br>P5, P8</div>
+    </div>
+  </div>
+
+  <div class="matrix">
+    <div class="matrix-cell">
+      <h4 class="hl2">🎯 Quick Wins (Do First)</h4>
+      <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 8px;">High impact, low complexity</p>
+      <ul>
+        <li><strong>P1</strong> — Evasion ordering (5 min to implement)</li>
+        <li><strong>P5</strong> — TT probe consolidation (5 min)</li>
+        <li><strong>P3</strong> — Capture futility correction (2 min)</li>
+      </ul>
+    </div>
+    <div class="matrix-cell">
+      <h4 class="hl3">🔬 Needs Testing (Do Second)</h4>
+      <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 8px;">Medium risk, needs careful validation</p>
+      <ul>
+        <li><strong>P7</strong> — Adaptive singular extension</li>
+        <li><strong>P2</strong> — Nonlinear LMR</li>
+        <li><strong>P6</strong> — qsearch threshold tuning</li>
+      </ul>
+    </div>
+    <div class="matrix-cell">
+      <h4 class="hlp">🧪 Experimental (Do Last)</h4>
+      <p style="font-size: 0.85em; color: var(--text-muted); margin-bottom: 8px;">Need profiling to validate NPS gain</p>
+      <ul>
+        <li><strong>P4</strong> — Threat weight prefetching</li>
+        <li><strong>P8</strong> — ContHist decay weights</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- ==================== SECTION 4: TESTING ==================== -->
+<div class="section" id="testing">
+  <div class="section-header">
+    <span class="icon">🧪</span>
+    <h2>Testing &amp; Validation Strategy</h2>
+  </div>
+
+  <p style="color: var(--text-muted); margin-bottom: 20px;">
+    Each improvement must be validated independently. Stockfish uses a rigorous testing methodology
+    based on SPRT (Sequential Probability Ratio Test) via the Fishtest distributed testing framework.
+    For local testing, we use these approaches:
+  </p>
+
+  <div class="matrix">
+    <div class="matrix-cell">
+      <h4>1. Bench Signature</h4>
+      <ul>
+        <li>Run <code>./stockfish bench</code></li>
+        <li>Verify binary produces valid output</li>
+        <li>Compare NPS (higher = better)</li>
+        <li>Node count will change (expected)</li>
+      </ul>
+    </div>
+    <div class="matrix-cell">
+      <h4>2. Self-Play Testing</h4>
+      <ul>
+        <li>Use <code>cutechess-cli</code> for matchplay</li>
+        <li>Minimum 1000 games at STC (10+0.1)</li>
+        <li>Compare against unmodified baseline</li>
+        <li>SPRT bounds: [0, 5] Elo at 95% CL</li>
+      </ul>
+    </div>
+    <div class="matrix-cell">
+      <h4>3. Regression Checks</h4>
+      <ul>
+        <li>Run <code>tests/perft.sh</code> (move gen)</li>
+        <li>Run <code>tests/signature.sh</code></li>
+        <li>Ensure no test failures</li>
+        <li>Check for crashes in edge cases</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin: 20px 0 12px;">Local Validation Commands</h3>
+  <div class="code-single">
+<pre># 1. Build modified version
+make clean && make build ARCH=apple-silicon -j8
+
+# 2. Run bench (quick NPS comparison)
+./stockfish bench 2>&1 | tail -3
+
+# 3. Compare node counts (search behavior changed?)
+diff &lt;(./stockfish_baseline bench 2>&1 | grep "Nodes searched")  \
+     &lt;(./stockfish bench 2>&1 | grep "Nodes searched")
+
+# 4. Self-play with cutechess-cli (if available)
+cutechess-cli \
+  -engine name=baseline cmd=./stockfish_baseline \
+  -engine name=modified cmd=./stockfish \
+  -each tc=10+0.1 proto=uci \
+  -rounds 1000 -pgnout results.pgn \
+  -sprt elo0=0 elo1=5 alpha=0.05 beta=0.05</pre>
+  </div>
+</div>
+
+
+<!-- ==================== SECTION 5: RISKS ==================== -->
+<div class="section" id="risks">
+  <div class="section-header">
+    <span class="icon">⚠️</span>
+    <h2>Risk Analysis</h2>
+  </div>
+
+  <div class="risk-grid">
+    <div class="risk-item">
+      <h4><span class="hl2">Low Risk</span> — P1, P3, P4, P5, P8</h4>
+      <p>These changes are additive or affect only move ordering/margins, not the fundamental search tree structure.
+        P1 adds more history info. P3 widens a margin. P4 adds prefetch hints (no-op if wrong). P5 is a refactor with identical behavior. P8 rescales existing values. None can cause crashes or correctness issues.</p>
+    </div>
+    <div class="risk-item">
+      <h4><span class="hl3">Medium Risk</span> — P2, P6, P7</h4>
+      <p>These change the search tree shape: P2 alters reduction amounts (could over/under-reduce),
+        P6 changes qsearch pruning (could miss tactics or search too many nodes), P7 changes extension behavior
+        (could cause search explosions in endgames). All need self-play testing. Worst case: revert the change.</p>
+    </div>
+    <div class="risk-item">
+      <h4><span class="hlr">Correctness Risk</span> — None</h4>
+      <p>All proposals preserve the correctness of the search algorithm. No change affects move legality,
+        repetition detection, or mate scoring. The engine will still play legal chess regardless of parameter values.</p>
+    </div>
+    <div class="risk-item">
+      <h4><span class="hlp">Interaction Risk</span> — P2 + P7</h4>
+      <p>LMR changes (P2) and singular extension changes (P7) interact: both affect the effective search depth.
+        If both are applied, they should be tested together as well as individually. Other proposals are independent.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ==================== SECTION 6: TIMELINE ==================== -->
+<div class="section" id="timeline">
+  <div class="section-header">
+    <span class="icon">📅</span>
+    <h2>Implementation Timeline</h2>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-dot" style="background: var(--accent2);"></div>
+      <h4>Phase 1: Quick Wins</h4>
+      <p>Implement P1 (evasion ordering), P5 (TT probe), and P3 (capture futility correction).
+        These are the safest changes with immediate measurable impact. Build, bench, and verify NPS.</p>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot" style="background: var(--accent3);"></div>
+      <h4>Phase 2: NPS Optimizations</h4>
+      <p>Implement P4 (threat weight prefetching) and P8 (contHist decay).
+        Profile before and after to verify NPS improvement. These don't change search behavior, only speed.</p>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot" style="background: var(--accent);"></div>
+      <h4>Phase 3: Search Tuning</h4>
+      <p>Implement P2 (nonlinear LMR), P6 (qsearch threshold), and P7 (adaptive singular extension).
+        Each needs individual testing via self-play. Apply one at a time, bench after each.</p>
+    </div>
+    <div class="timeline-item">
+      <div class="timeline-dot" style="background: var(--purple);"></div>
+      <h4>Phase 4: Integration &amp; Validation</h4>
+      <p>Combine all successful changes. Run full bench suite. Compare overall NPS and search quality
+        against the unmodified baseline. Document results.</p>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <p><strong>Expected Outcome:</strong> The combination of improved move ordering (P1, P8),
+    smarter pruning (P3, P6), better reductions (P2), and enhanced extensions (P7) should
+    produce a measurable improvement in both NPS and search quality. Conservative estimate:
+    <strong>+10 to +30 Elo combined</strong> (subject to self-play testing validation).
+    NPS improvement from P4 and P5: <strong>+2 to +5%</strong>.</p>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+</body>
+</html>
