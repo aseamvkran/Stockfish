@@ -59,7 +59,6 @@ class Option {
    private:
     friend class OptionsMap;
     friend class Engine;
-    friend class Tune;
 
 
     std::string       defaultValue, currentValue, type;

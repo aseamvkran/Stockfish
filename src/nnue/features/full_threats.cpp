@@ -286,8 +286,8 @@ void FullThreats::append_changed_indices(Color                   perspective,
         const IndexType index  = make_index(perspective, attacker, from, to, attacked, ksq);
 
         if (prefetchBase)
-            prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(reinterpret_cast<const void*>(
-              reinterpret_cast<uintptr_t>(prefetchBase) + uintptr_t(index) * prefetchStride));
+            prefetch_low(reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(prefetchBase)
+                                                       + uintptr_t(index) * prefetchStride));
         insert.push_back_if_lt(index, Dimensions);
     }
 }
@@ -318,10 +318,10 @@ void FullThreats::append_changed_indices_both(Square                  white_ksq,
 
         if (prefetchBase)
         {
-            prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(reinterpret_cast<const void*>(
-              reinterpret_cast<uintptr_t>(prefetchBase) + uintptr_t(white_index) * prefetchStride));
-            prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(reinterpret_cast<const void*>(
-              reinterpret_cast<uintptr_t>(prefetchBase) + uintptr_t(black_index) * prefetchStride));
+            prefetch_low(reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(prefetchBase)
+                                                       + uintptr_t(white_index) * prefetchStride));
+            prefetch_low(reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(prefetchBase)
+                                                       + uintptr_t(black_index) * prefetchStride));
         }
 
         white_insert.push_back_if_lt(white_index, Dimensions);

@@ -34,7 +34,6 @@ jobs:
         continue-on-error: true
         with:
           clang-format-version: "20"
-          exclude-regex: "incbin"
 
       - name: Comment on PR
         if: steps.clang-format.outcome == 'failure'

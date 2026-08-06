@@ -532,9 +532,12 @@ bool Search::Worker::iterative_deepening() {
             // Bring the last best move to the front for best thread selection.
             if (!lastBestMovePV.empty())
             {
-                Utility::move_to_front(rootMoves, [&lastPV = std::as_const(lastBestMovePV)](
-                                                    const auto& rm) { return rm == lastPV[0]; });
-                rootMoves[0].score = rootMoves[0].uciScore = lastBestMoveScore;
+                auto it = std::find_if(rootMoves.begin(), rootMoves.end(),
+                                       [&lastPV = std::as_const(lastBestMovePV)](const auto& rm) {
+                                           return rm == lastPV[0];
+                                       });
+                if (it != rootMoves.end())
+                    std::rotate(rootMoves.begin(), it, it + 1);
                 rootMoves[0].pv                            = lastBestMovePV;
                 rootMoves[0].unset_bound_flags();
 
@@ -2085,7 +2088,6 @@ void SearchManager::check_time(Search::Worker& worker) {
     if (tick - lastInfoTime >= 1000)
     {
         lastInfoTime = tick;
-        dbg_print();
     }
 
     // We should not stop pondering until told so by the GUI

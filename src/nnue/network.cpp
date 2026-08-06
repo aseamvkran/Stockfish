@@ -26,9 +26,6 @@
 #include <vector>
 #include <filesystem>
 
-#define INCBIN_SILENCE_BITCODE_WARNING
-#include "../incbin/incbin.h"
-
 #include "../evaluate.h"
 #include "../misc.h"
 #include "../position.h"
@@ -38,15 +35,21 @@
 #include "nnue_misc.h"
 #include "nnz_helper.h"
 
-// Macro to embed the default efficiently updatable neural network (NNUE) file
-// data in the engine binary (using incbin.h, by Dale Weiler).
-// This macro invocation will declare the following three variables
-//     const unsigned char        gEmbeddedNNUEData[];  // a pointer to the embedded data
-//     const unsigned char *const gEmbeddedNNUEEnd;     // a marker to the end
-//     const unsigned int         gEmbeddedNNUESize;    // the size of the embedded file
-// Note that this does not work in Microsoft Visual Studio.
+// Embed the default efficiently updatable neural network (NNUE) file data in the
+// engine binary, declaring:
+//     const unsigned char gEmbeddedNNUEData[];  // the embedded data
+//     const unsigned int  gEmbeddedNNUESize;    // the size of the embedded file
+// Universal builds only declare them here; universal/nnue_embed.cpp supplies the
+// definitions (the macOS x86 slice resolves its pointer at runtime). MSVC has
+// never embedded the net and keeps loading it from file.
+// ponytail: the plain build used to reach for the vendored incbin.h to do this;
+// #embed is the in-language equivalent, so the dep is gone. It needs GCC 15+ or
+// Clang 19+, the same floor the universal build already required.
 #if !defined(UNIVERSAL_BINARY) && !defined(_MSC_VER) && !defined(NNUE_EMBEDDING_OFF)
-INCBIN(EmbeddedNNUE, EvalFileDefaultName);
+extern const unsigned char gEmbeddedNNUEData[] = {
+    #embed EvalFileDefaultName
+};
+extern const unsigned int gEmbeddedNNUESize = sizeof(gEmbeddedNNUEData);
 #elif defined(UNIVERSAL_BINARY_MACOS_X86_SLICE)
 // Determined at runtime, see universal/nnue_embed.cpp
 extern const unsigned char* const gEmbeddedNNUEData;

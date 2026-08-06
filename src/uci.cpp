@@ -303,8 +303,6 @@ void UCIEngine::bench(std::istream& args) {
 
     elapsed = now() - elapsed + 1;  // Ensure positivity to avoid a 'divide by zero'
 
-    dbg_print();
-
     std::cerr << "\n==========================="    //
               << "\nTotal time (ms) : " << elapsed  //
               << "\nNodes searched  : " << nodes    //
@@ -438,8 +436,6 @@ void UCIEngine::benchmark(std::istream& args) {
 
     // Ensure positivity to avoid a 'divide by zero'
     const auto totalTimeMs = std::max<i64>(std::chrono::duration_cast<ms>(totalTime).count(), 1LL);
-
-    dbg_print();
 
     std::cerr << "\n";
 

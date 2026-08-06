@@ -145,8 +145,8 @@ void PP_3Wide::append_changed_indices(Color                                    p
                         IndexList& out) {
         auto push = [&](IndexType index) {
             if (prefetchBase)
-                prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(reinterpret_cast<const void*>(
-                  reinterpret_cast<uintptr_t>(prefetchBase) + uintptr_t(index) * prefetchStride));
+                prefetch_low(reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(prefetchBase)
+                                                           + uintptr_t(index) * prefetchStride));
             out.push_back(index);
         };
         const Bitboard unchanged = (pawnsW | pawnsB) & ~(updatedW | updatedB);
@@ -202,10 +202,10 @@ void PP_3Wide::append_changed_indices_both(Square                  white_ksq,
 
             if (prefetchBase)
             {
-                prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(
+                prefetch_low(
                   reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(prefetchBase)
                                                 + uintptr_t(white_index) * prefetchStride));
-                prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(
+                prefetch_low(
                   reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(prefetchBase)
                                                 + uintptr_t(black_index) * prefetchStride));
             }
